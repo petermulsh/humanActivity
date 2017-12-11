@@ -1,0 +1,223 @@
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load in 
+
+#-----------------
+# Michael Hackenberg
+# This code is copied from the Kaggle online editor so I don't know if it will run the way it is currently formatted
+# Each section denoted by a dashed line was in its own cell in the kaggle notebook
+#-----------------
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+
+from subprocess import check_output
+print(check_output(["ls", "../input"]).decode("utf8"))
+
+# Any results you write to the current directory are saved as output.
+import matplotlib
+import matplotlib.pyplot as plt
+test = pd.read_csv("../input/test.csv")
+train = pd.read_csv("../input/train.csv")
+
+from sklearn.utils import shuffle
+train = shuffle(train)
+
+train.head()
+
+#-----------------------
+
+import sklearn
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.feature_selection import SelectFromModel
+
+features = train.iloc[:,0:562]
+label = train['Activity']
+
+clf = ExtraTreesClassifier()
+clf = clf.fit(features, label)
+model = SelectFromModel(clf,prefit=True)
+new_Features = model.transform(features)
+print(new_Features.shape)
+new_Features
+
+#---------------------------
+
+from sklearn.neighbors import KDTree
+from sklearn.neighbors import NearestNeighbors
+
+nn = NearestNeighbors(5, algorithm='kd_tree')
+k = nn.fit(new_Features)
+
+#--------------------------------
+# Create a graph to ompare several different models. Used as a starting point for the project
+from sklearn import model_selection
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+
+array = test.values
+X = array[:,0:561]
+Y = array[:,562]
+
+models = []
+models.append(('LR', LogisticRegression()))
+models.append(('LDA', LinearDiscriminantAnalysis()))
+models.append(('KNN', KNeighborsClassifier()))
+models.append(('CART', DecisionTreeClassifier()))
+models.append(('NB', GaussianNB()))
+models.append(('SVM', SVC()))
+
+results = []
+names = []
+
+scoring = 'accuracy'
+for name, model in models:
+    kfold = model_selection.KFold(n_splits=10, shuffle=True, random_state=7)
+    cv_results = model_selection.cross_val_score(model, X, Y, cv=kfold, scoring=scoring)
+    results.append(cv_results)
+    names.append(name)
+    msg = "%s: %f (%f)" % (name, cv_results.mean(), cv_results.std())
+    print(msg)
+
+fig = plt.figure()
+fig.suptitle('Algorithm Comparison')
+ax = fig.add_subplot(111)
+plt.boxplot(results)
+ax.set_xticklabels(names)
+plt.show()
+
+#------------------------
+
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
+
+array = train.values
+info = array[:,0:561]
+activity = array[:,562]
+
+arr2 = test.values
+inf2 = arr2[:,0:561]
+act2 = arr2[:,562]
+
+knn = KNeighborsClassifier()
+knn.fit(info, activity)
+KNeighborsClassifier(algorithm='kd_tree', leaf_size=30, metric='minkowski',
+           metric_params=None, n_jobs=1, n_neighbors=5, p=2,
+           weights='uniform')
+predictions = knn.predict(inf2)
+activity_names = ['STANDING','SITTING','LAYING','WALKING','WALKING_UPSTAIRS','WALKING_DOWNSTAIRS']
+print(classification_report(act2, predictions)) #,target_names=activity_names
+
+#---------------------------------
+# Combine the two provided .csv files so that the data can be speparated however desired
+array = train.values
+arr2 = test.values
+arr3 = np.concatenate((array,arr2),axis=0)
+print(arr3.shape)
+
+#-------------------------
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.metrics import classification_report
+
+#combine data
+arr1 = train.values
+arr2 = test.values
+arr3 = np.concatenate((arr1,arr2),axis=0)
+
+#separate train and test labels
+trainLabel = arr3[:7000,562]
+testLabel = arr3[7000:,562]
+
+#Create matrix of data
+#allData = arr3.iloc[:,:561].as_matrix()
+dataMatrix = np.asmatrix(arr3[:,:561],dtype='float')
+
+#Find Most relevant features
+U, s, V = np.linalg.svd(dataMatrix,full_matrices=False)
+
+#Use most relevant features
+numFeatures = 250
+newtrain = U[:7000,:numFeatures]
+newtest = U[7000:,:numFeatures]
+
+#run the model
+lda = LinearDiscriminantAnalysis()
+lda.fit(newtrain, trainLabel)
+
+predictions = lda.predict(newtest)
+activity_names = ['STANDING','SITTING','LAYING','WALKING','WALKING_UPSTAIRS','WALKING_DOWNSTAIRS']
+print(classification_report(testLabel, predictions))
+
+#-----------------------------------------
+# Retrive the precision value from the formatted output of classification report
+def collect_avg_precision(report):
+    report_data = []
+    lines = report.split('\n')
+    values = lines[9].split('      ')
+    strAvg = values[2].strip()
+    fltAvg = float(strAvg)
+    return fltAvg
+	
+#-------------------------------------
+# Run a model with variable amount of features to populate a collection of average precision values
+avgPrec = []
+#lda = LinearDiscriminantAnalysis()
+#knn = KNeighborsClassifier() # max precision .88 with 23-25 features
+lr = LogisticRegression()
+for numFeatures in range(10,560,10):#10,560,10
+    #separate data
+    newtrain = U[:7000,:numFeatures]
+    newtest = U[7000:,:numFeatures]
+    #run the model
+    lr.fit(newtrain, trainLabel)
+    #test the model
+    predictions = lr.predict(newtest)
+    activity_names = ['STANDING','SITTING','LAYING','WALKING','WALKING_UPSTAIRS','WALKING_DOWNSTAIRS']
+    report = classification_report(testLabel, predictions)
+    value = collect_avg_precision(report)
+    avgPrec.append([numFeatures, value])
+
+	
+#---------------------------------------------
+
+trainL = arr3[:7000,562]
+testL = arr3[7000:,562]
+trainD = arr3[:7000,0:561]
+testD = arr3[7000:,0:561]
+
+#lda = LinearDiscriminantAnalysis()
+#knn = KNeighborsClassifier() # max precision .88 with 23-25 features
+lr = LogisticRegression()
+
+#run the model
+lr.fit(trainD, trainL)
+#test the model
+predictions = lr.predict(testD)
+activity_names = ['STANDING','SITTING','LAYING','WALKING','WALKING_UPSTAIRS','WALKING_DOWNSTAIRS']
+report = classification_report(testL, predictions)
+value = collect_avg_precision(report)
+value
+#avgPrec.append([numFeatures, value])
+
+#------------------------------------------
+# Create the graph of average precision based on number of features selected
+depVar = []
+indVar = []
+
+for i in range(len(avgPrec)):
+    depVar.append(avgPrec[i][0])
+    indVar.append(avgPrec[i][1])
+
+fig = plt.figure()
+fig.suptitle('Features and Precision')
+fig.add_subplot(111)
+plt.scatter(depVar, indVar)
+plt.show()
+
+#---------------------------------------
