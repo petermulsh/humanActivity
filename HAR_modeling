@@ -221,3 +221,37 @@ plt.scatter(depVar, indVar)
 plt.show()
 
 #---------------------------------------
+
+
+V
+vArr = np.squeeze(np.asarray(V))
+vArr.sort()
+vArr
+
+#--------------------------------------
+
+# FIND IMPORTANT FEATURES
+
+#U
+#V
+col1Mat = V[:,0]
+col1Arr = np.squeeze(np.asarray(col1Mat))
+#col1Arr #raw: first:-1.64580409e-02 last:0.00000000e+00
+#sorted(col1Arr) # sorted: from -0.3419128796815134 to 0.27418404488480869
+col1Arr.sort()
+col1Arr[0]
+#col1Arr[-1]
+
+# Graph it
+depVar = []
+indVar = range(len(col1Arr))
+
+for i in range(len(col1Arr)):
+    depVar.append(col1Arr[i])
+
+
+fig = plt.figure()
+fig.suptitle('SVD Important Features')
+fig.add_subplot(111)
+plt.scatter(indVar, depVar)
+plt.show()
